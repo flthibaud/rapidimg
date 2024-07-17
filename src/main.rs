@@ -5,6 +5,7 @@ use image::ImageFormat;
 use std::error::Error;
 use std::fs::{self, File};
 use std::path::Path;
+use std::io;
 
 /// Simple program to compress images
 #[derive(Parser, Debug)]
@@ -102,7 +103,10 @@ fn main() {
 fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
     let output_file = File::create(output_path).expect("Failed to create output file");
 
-    let quality = 75;
+    println!("{}", "Entrez la qualité de compression (0-100): ");
+    let mut quality: String = String::new();
+    io::stdin().read_line(&mut quality).expect("Failed to read line");
+    let quality: u8 = quality.trim().parse().expect("Please enter a number between 0 and 100");
 
     let mut jpeg_encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(output_file, quality);
     jpeg_encoder
