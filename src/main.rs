@@ -103,10 +103,21 @@ fn main() {
 fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
     let output_file = File::create(output_path).expect("Failed to create output file");
 
-    println!("{}", "Entrez la qualité de compression (0-100): ");
-    let mut quality: String = String::new();
-    io::stdin().read_line(&mut quality).expect("Failed to read line");
-    let quality: u8 = quality.trim().parse().expect("Please enter a number between 0 and 100");
+    println!("Entrez la qualité de compression (0-100) [par défaut: 75]: ");
+    let mut quality_input = String::new();
+    io::stdin().read_line(&mut quality_input).expect("Failed to read line");
+    
+    let quality = if quality_input.trim().is_empty() {
+        75 // Valeur par défaut
+    } else {
+        match quality_input.trim().parse::<u8>() {
+            Ok(q) if q <= 100 => q,
+            _ => {
+                eprintln!("Valeur incorrecte. Utilisation de la qualité par défaut: 75");
+                75
+            }
+        }
+    };
 
     let mut jpeg_encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(output_file, quality);
     jpeg_encoder
