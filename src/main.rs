@@ -6,6 +6,7 @@ use std::error::Error;
 use std::fs::{self, File};
 use std::path::Path;
 use std::io;
+use oxipng::{indexset, optimize, InFile, Options, OutFile, RowFilter, StripChunks};
 
 /// Simple program to compress images
 #[derive(Parser, Debug)]
@@ -92,7 +93,7 @@ fn main() {
 
             match format {
                 ImageFormat::Jpeg => compress_jpeg(&img, &output_file_path),
-                // ImageFormat::Png => compress_png(&img, &output_file_path),
+                ImageFormat::Png => compress_png(input, &output_file_path),
                 _ => println!("Format non pris en charge pour la compression"),
             }
         }
@@ -125,4 +126,31 @@ fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
         .expect("Failed to encode image as JPEG");
 
     println!("Image compressée et sauvegardée avec succès en JPEG !");
+}
+
+fn compress_png(input_path: &str, output_path: &Path) {
+    let mut options = Options::max_compression();
+    options.filter = indexset![
+        RowFilter::None,
+        RowFilter::Sub,
+        RowFilter::Up,
+        RowFilter::Average,
+        RowFilter::Paeth,
+    ];
+    options.optimize_alpha = true;
+    options.strip = StripChunks::Safe;
+    options.bit_depth_reduction = true;
+    options.color_type_reduction = true;
+    options.palette_reduction = true;
+    options.grayscale_reduction = true;
+
+    let infile = InFile::Path(input_path.into());
+    let outfile = OutFile::Path {
+        path: Some(output_path.to_path_buf()),
+        preserve_attrs: false,
+    };
+
+    optimize(&infile, &outfile, &options).expect("Failed to optimize PNG image");
+
+    println!("Image compressée et sauvegardée avec succès en PNG !");
 }
