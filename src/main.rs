@@ -1,12 +1,12 @@
+mod compress;
+
 // Importation des bibliothèques nécessaires
 use clap::Parser;
 use image::{io::Reader as ImageReader, DynamicImage};
 use image::ImageFormat;
 use std::error::Error;
-use std::fs::{self, File};
+use std::fs;
 use std::path::Path;
-use std::io;
-use oxipng::{indexset, optimize, InFile, Options, OutFile, RowFilter, StripChunks};
 
 /// Simple program to compress images
 #[derive(Parser, Debug)]
@@ -57,43 +57,37 @@ fn main() {
         return;
     }
 
-    match load_image(input) {
-        Ok(img) => {
-            println!("Image dimensions: {}x{}", img.width(), img.height());
-
-            match fs::metadata(input) {
-                Ok(metadata) => {
-                    let size_in_bytes = metadata.len();
-                    let human_readable = human_readable_size(size_in_bytes);
-                    println!("Image size: {}", human_readable);
+    let input_path = Path::new(input);
+    if input_path.is_dir() {
+        match fs::read_dir(input) {
+            Ok(entries) => {
+                for entry in entries {
+                    let entry = entry.expect("Failed to read directory entry");
+                    let path = entry.path();
+                    if path.is_file() {
+                        process_image(&path, output_path);
+                    }
                 }
-                Err(e) => eprintln!("Error reading file metadata: {}", e),
             }
+            Err(e) => eprintln!("Error reading input directory: {}", e),
+        }
+    } else {
+        process_image(input_path, output_path);
+    }
+}
 
-            // Devine le format de l'image
-            let format = ImageReader::open(input)
-                .expect("Failed to open image file")
-                .with_guessed_format()
-                .expect("Failed to guess image format")
-                .format()
-                .expect("Failed to determine image format");
-
-            let input_filename = Path::new(input)
-                .file_stem()
-                .expect("Failed to get input file name")
-                .to_str()
-                .expect("Failed to convert file name to string");
-            let input_extension = Path::new(input)
-                .extension()
-                .expect("Failed to get input file extension")
-                .to_str()
-                .expect("Failed to convert file extension to string");
+fn process_image(input: &Path, output_path: &Path) {
+    println!("Processing image: {:?}", input);
+    let input_str = input.to_str().unwrap();
+    match load_image(input_str) {
+        Ok(img) => {
+            let format = guess_image_format(input_str);
+            let (input_filename, input_extension) = get_filename_and_extension(input);
 
             let output_file_path = output_path.join(format!("{}_compressed.{}", input_filename, input_extension));
-
             match format {
-                ImageFormat::Jpeg => compress_jpeg(&img, &output_file_path),
-                ImageFormat::Png => compress_png(input, &output_file_path),
+                ImageFormat::Jpeg => compress::compress_jpeg(&img, &output_file_path),
+                ImageFormat::Png => compress::compress_png(input_str, &output_file_path),
                 _ => println!("Format non pris en charge pour la compression"),
             }
         }
@@ -101,57 +95,25 @@ fn main() {
     }
 }
 
-fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
-    let output_file = File::create(output_path).expect("Failed to create output file");
-
-    println!("Entrez la qualité de compression (0-100) [par défaut: 75]: ");
-    let mut quality_input = String::new();
-    io::stdin().read_line(&mut quality_input).expect("Failed to read line");
-    
-    let quality = if quality_input.trim().is_empty() {
-        75 // Valeur par défaut
-    } else {
-        match quality_input.trim().parse::<u8>() {
-            Ok(q) if q <= 100 => q,
-            _ => {
-                eprintln!("Valeur incorrecte. Utilisation de la qualité par défaut: 75");
-                75
-            }
-        }
-    };
-
-    let mut jpeg_encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(output_file, quality);
-    jpeg_encoder
-        .encode_image(img)
-        .expect("Failed to encode image as JPEG");
-
-    println!("Image compressée et sauvegardée avec succès en JPEG !");
+fn guess_image_format(input: &str) -> ImageFormat {
+    ImageReader::open(input)
+        .expect("Failed to open image file")
+        .with_guessed_format()
+        .expect("Failed to guess image format")
+        .format()
+        .expect("Failed to determine image format")
 }
 
-fn compress_png(input_path: &str, output_path: &Path) {
-    let mut options = Options::max_compression();
-    options.filter = indexset![
-        RowFilter::None,
-        RowFilter::Sub,
-        RowFilter::Up,
-        RowFilter::Average,
-        RowFilter::Paeth,
-    ]; // Utilise tous les types de filtres de ligne
-    options.optimize_alpha = true; // Optimise les canaux alpha
-    options.strip = StripChunks::Safe; // Supprime les métadonnées inutiles
-    options.bit_depth_reduction = true; // Réduit la profondeur de bits si possible
-    options.color_type_reduction = true; // Réduit le type de couleur si possible
-    options.palette_reduction = true; // Réduit la palette de couleurs si possible
-    options.grayscale_reduction = true; // Convertit en niveaux de gris si possible
-    options.interlace = Some(oxipng::Interlacing::None); // Désactive l'entrelacement pour réduire la taille
-
-    let infile = InFile::Path(input_path.into());
-    let outfile = OutFile::Path {
-        path: Some(output_path.to_path_buf()),
-        preserve_attrs: false,
-    };
-
-    optimize(&infile, &outfile, &options).expect("Failed to optimize PNG image");
-
-    println!("Image compressée et sauvegardée avec succès en PNG !");
+fn get_filename_and_extension(input: &Path) -> (String, String) {
+    let input_filename = input.file_stem()
+        .expect("Failed to get input file name")
+        .to_str()
+        .expect("Failed to convert file name to string")
+        .to_string();
+    let input_extension = input.extension()
+        .expect("Failed to get input file extension")
+        .to_str()
+        .expect("Failed to convert file extension to string")
+        .to_string();
+    (input_filename, input_extension)
 }
