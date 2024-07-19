@@ -136,13 +136,14 @@ fn compress_png(input_path: &str, output_path: &Path) {
         RowFilter::Up,
         RowFilter::Average,
         RowFilter::Paeth,
-    ];
-    options.optimize_alpha = true;
-    options.strip = StripChunks::Safe;
-    options.bit_depth_reduction = true;
-    options.color_type_reduction = true;
-    options.palette_reduction = true;
-    options.grayscale_reduction = true;
+    ]; // Utilise tous les types de filtres de ligne
+    options.optimize_alpha = true; // Optimise les canaux alpha
+    options.strip = StripChunks::Safe; // Supprime les métadonnées inutiles
+    options.bit_depth_reduction = true; // Réduit la profondeur de bits si possible
+    options.color_type_reduction = true; // Réduit le type de couleur si possible
+    options.palette_reduction = true; // Réduit la palette de couleurs si possible
+    options.grayscale_reduction = true; // Convertit en niveaux de gris si possible
+    options.interlace = Some(oxipng::Interlacing::None); // Désactive l'entrelacement pour réduire la taille
 
     let infile = InFile::Path(input_path.into());
     let outfile = OutFile::Path {
