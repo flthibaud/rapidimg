@@ -87,7 +87,15 @@ fn process_image(input: &Path, output_path: &Path) {
             let output_file_path = output_path.join(format!("{}_compressed.{}", input_filename, input_extension));
             match format {
                 ImageFormat::Jpeg => compress::compress_jpeg(&img, &output_file_path),
-                ImageFormat::Png => compress::compress_png(input_str, &output_file_path),
+                ImageFormat::Png => match compress::compress_png(input_str, &output_file_path) {
+                    Ok(stats) => {
+                        println!("Image compressée et sauvegardée avec succès en PNG !");
+                        println!("Taille d'origine: {}", human_readable_size(stats.input_size));
+                        println!("Nouvelle taille: {}", human_readable_size(stats.output_size));
+                        println!("Taux de compression: {:.2}%", stats.compression_ratio * 100.0);
+                    }
+                    Err(e) => eprintln!("Error compressing image: {}", e),
+                }
                 _ => println!("Format non pris en charge pour la compression"),
             }
         }

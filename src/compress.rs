@@ -4,6 +4,12 @@ use image::DynamicImage;
 use std::fs::File;
 use std::io;
 
+pub struct CompressionStats {
+  pub input_size: u64,
+  pub output_size: u64,
+  pub compression_ratio: f64,
+}
+
 pub fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
   let output_file = File::create(output_path).expect("Failed to create output file");
 
@@ -31,7 +37,7 @@ pub fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
   println!("Image compressée et sauvegardée avec succès en JPEG !");
 }
 
-pub fn compress_png(input_path: &str, output_path: &Path) {
+pub fn compress_png(input_path: &str, output_path: &Path) -> Result<CompressionStats, String> {
   let mut options = Options::max_compression();
   options.filter = indexset![
       RowFilter::None,
@@ -54,7 +60,22 @@ pub fn compress_png(input_path: &str, output_path: &Path) {
       preserve_attrs: false,
   };
 
-  optimize(&infile, &outfile, &options).expect("Failed to optimize PNG image");
+  let input_size = std::fs::metadata(input_path)
+      .map_err(|e| format!("Failed to read input file metadata: {}", e))?
+      .len();
 
-  println!("Image compressée et sauvegardée avec succès en PNG !");
+  optimize(&infile, &outfile, &options)
+    .map_err(|e| format!("Failed to optimize PNG: {}", e))?;
+
+  let output_size = std::fs::metadata(output_path)
+      .map_err(|e| format!("Failed to read output file metadata: {}", e))?
+      .len();
+
+  let compression_ratio = 1.0 - (output_size as f64 / input_size as f64);
+
+  Ok(CompressionStats {
+      input_size,
+      output_size,
+      compression_ratio,
+  })
 }
