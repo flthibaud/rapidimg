@@ -1,4 +1,5 @@
 mod compress;
+mod convert;
 
 // Importation des bibliothèques nécessaires
 use clap::Parser;
@@ -19,6 +20,10 @@ struct Args {
     /// Output directory (optional)
     #[arg(short, long)]
     output: Option<String>,
+
+    /// Convert images to WebP format
+    #[arg(short, long)]
+    webp: bool,
 }
 
 // Fonction pour charger une image à partir d'un fichier
@@ -69,18 +74,18 @@ fn main() {
                     let entry = entry.expect("Failed to read directory entry");
                     let path = entry.path();
                     if path.is_file() {
-                        process_image(&path, Some(&output_base_path));
+                        process_image(&path, Some(&output_base_path), args.webp);
                     }
                 }
             }
             Err(e) => eprintln!("Error reading input directory: {}", e),
         }
     } else {
-        process_image(input_path, output_dir.map(Path::new));
+        process_image(input_path, output_dir.map(Path::new), args.webp);
     }
 }
 
-fn process_image(input: &Path, output_dir: Option<&Path>) {
+fn process_image(input: &Path, output_dir: Option<&Path>, webp: bool) {
     println!("Processing image: {:?}", input);
     let input_str = input.to_str().unwrap();
     match load_image(input_str) {
@@ -89,25 +94,39 @@ fn process_image(input: &Path, output_dir: Option<&Path>) {
             let (input_filename, input_extension) = get_filename_and_extension(input);
 
             let output_file_path = match output_dir {
-                Some(dir) => dir.join(format!("{}_compressed.{}", input_filename, input_extension)),
+                Some(dir) => {
+                    if webp {
+                        dir.join(format!("{}.webp", input_filename))
+                    } else {
+                        dir.join(format!("{}_compressed.{}", input_filename, input_extension))
+                    }
+                },
                 None => {
                     let input_parent = input.parent().expect("Failed to get input file parent directory");
-                    input_parent.join(format!("{}_compressed.{}", input_filename, input_extension))
+                    if webp {
+                        input_parent.join(format!("{}.webp", input_filename))
+                    } else {
+                        input_parent.join(format!("{}_compressed.{}", input_filename, input_extension))
+                    }
                 }
             };
 
-            match format {
-                ImageFormat::Jpeg => compress::compress_jpeg(&img, &output_file_path),
-                ImageFormat::Png => match compress::compress_png(input_str, &output_file_path) {
-                    Ok(stats) => {
-                        println!("Image compressée et sauvegardée avec succès en PNG !");
-                        println!("Taille d'origine: {}", human_readable_size(stats.input_size));
-                        println!("Nouvelle taille: {}", human_readable_size(stats.output_size));
-                        println!("Taux de compression: {:.2}%", stats.compression_ratio * 100.0);
-                    }
-                    Err(e) => eprintln!("Error compressing image: {}", e),
-                },
-                _ => println!("Format non pris en charge pour la compression"),
+            if webp {
+                convert::image_to_webp(&input_str.to_string(), &output_file_path);
+            } else {
+                match format {
+                    ImageFormat::Jpeg => compress::compress_jpeg(&img, &output_file_path),
+                    ImageFormat::Png => match compress::compress_png(input_str, &output_file_path) {
+                        Ok(stats) => {
+                            println!("Image compressée et sauvegardée avec succès en PNG !");
+                            println!("Taille d'origine: {}", human_readable_size(stats.input_size));
+                            println!("Nouvelle taille: {}", human_readable_size(stats.output_size));
+                            println!("Taux de compression: {:.2}%", stats.compression_ratio * 100.0);
+                        }
+                        Err(e) => eprintln!("Error compressing image: {}", e),
+                    },
+                    _ => println!("Format non pris en charge pour la compression"),
+                }
             }
         }
         Err(e) => eprintln!("Error loading image: {}", e),
