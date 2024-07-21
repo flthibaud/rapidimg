@@ -34,13 +34,30 @@ To compress an image, run the following command:
 ```sh
 ./target/release/rapidimg -i <input_image_path>
 ```
-### Example
+### Examples
 ```sh
 ./target/release/rapidimg -i example.jpg
 ```
+to specify an output directory, use the `-o` option:
+```sh
+./target/release/rapidimg -i example.jpg -o compressed
+```
+to convert images to WebP format, use the `--webp` option:
+```sh
+./target/release/rapidimg -i images -o compressed --webp
+```
 
 ### Command Line Options
-- `-i, --input <INPUT>`: Specify the input image file.
+- `-i, --input <INPUT>`: Specify the input image file or directory.
+- `-o, --output <OUTPUT>`: (Optional) Specify the output directory for the compressed images.
+- `--webp`: (Optional) Convert images to WebP format.
+
+## Roadmap
+- Add support for more image formats.
+- Add support for image resizing.
+- Add progress indicator.
+- Add support for more conversion formats.
+- Metadata preservation.
 
 ## Development
 To contribute to this project, follow these steps:

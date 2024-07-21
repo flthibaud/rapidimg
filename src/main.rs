@@ -22,7 +22,7 @@ struct Args {
     output: Option<String>,
 
     /// Convert images to WebP format
-    #[arg(short, long)]
+    #[arg(long)]
     webp: bool,
 }
 
