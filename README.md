@@ -35,6 +35,7 @@ To compress an image, run the following command:
 ./target/release/rapidimg -i <input_image_path>
 ```
 ### Examples
+to compress a single image:
 ```sh
 ./target/release/rapidimg -i example.jpg
 ```
