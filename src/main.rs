@@ -10,15 +10,15 @@ use std::path::Path;
 
 /// Simple program to compress images
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)] // Macro pour définir la structure des arguments en ligne de commande
+#[command(version, about, long_about = None)]
 struct Args {
-    /// Input image file
-    #[arg(short, long)] // Spécifie les options de l'argument: court (-i) et long (--input)
-    input: String, // Champ pour stocker le nom du fichier d'entrée
-
-    /// Output image file
+    /// Input image file or directory
     #[arg(short, long)]
-    output: String,
+    input: String,
+
+    /// Output directory (optional)
+    #[arg(short, long)]
+    output: Option<String>,
 }
 
 // Fonction pour charger une image à partir d'un fichier
@@ -48,35 +48,39 @@ fn main() {
     let args = Args::parse();
 
     let input = &args.input;
-    let output_dir = &args.output;
-
-    // Vérifiez que le chemin de sortie est un répertoire
-    let output_path = Path::new(output_dir);
-    if !output_path.is_dir() {
-        eprintln!("Error: Output path is not a directory. Please provide a valid directory path.");
-        return;
-    }
+    let output_dir = args.output.as_deref();
 
     let input_path = Path::new(input);
+
     if input_path.is_dir() {
+        let parent_dir_name = input_path.file_name().expect("Failed to get parent directory name");
+        let output_base_path = match output_dir {
+            Some(dir) => Path::new(dir).join(parent_dir_name),
+            None => input_path.to_path_buf(),
+        };
+
+        if !output_base_path.exists() {
+            fs::create_dir_all(&output_base_path).expect("Failed to create output directory");
+        }
+
         match fs::read_dir(input) {
             Ok(entries) => {
                 for entry in entries {
                     let entry = entry.expect("Failed to read directory entry");
                     let path = entry.path();
                     if path.is_file() {
-                        process_image(&path, output_path);
+                        process_image(&path, Some(&output_base_path));
                     }
                 }
             }
             Err(e) => eprintln!("Error reading input directory: {}", e),
         }
     } else {
-        process_image(input_path, output_path);
+        process_image(input_path, output_dir.map(Path::new));
     }
 }
 
-fn process_image(input: &Path, output_path: &Path) {
+fn process_image(input: &Path, output_dir: Option<&Path>) {
     println!("Processing image: {:?}", input);
     let input_str = input.to_str().unwrap();
     match load_image(input_str) {
@@ -84,7 +88,14 @@ fn process_image(input: &Path, output_path: &Path) {
             let format = guess_image_format(input_str);
             let (input_filename, input_extension) = get_filename_and_extension(input);
 
-            let output_file_path = output_path.join(format!("{}_compressed.{}", input_filename, input_extension));
+            let output_file_path = match output_dir {
+                Some(dir) => dir.join(format!("{}_compressed.{}", input_filename, input_extension)),
+                None => {
+                    let input_parent = input.parent().expect("Failed to get input file parent directory");
+                    input_parent.join(format!("{}_compressed.{}", input_filename, input_extension))
+                }
+            };
+
             match format {
                 ImageFormat::Jpeg => compress::compress_jpeg(&img, &output_file_path),
                 ImageFormat::Png => match compress::compress_png(input_str, &output_file_path) {
@@ -95,7 +106,7 @@ fn process_image(input: &Path, output_path: &Path) {
                         println!("Taux de compression: {:.2}%", stats.compression_ratio * 100.0);
                     }
                     Err(e) => eprintln!("Error compressing image: {}", e),
-                }
+                },
                 _ => println!("Format non pris en charge pour la compression"),
             }
         }
