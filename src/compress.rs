@@ -38,44 +38,55 @@ pub fn compress_jpeg(img: &DynamicImage, output_path: &Path) {
 }
 
 pub fn compress_png(input_path: &str, output_path: &Path) -> Result<CompressionStats, String> {
-  let mut options = Options::max_compression();
-  options.filter = indexset![
-      RowFilter::None,
-      RowFilter::Sub,
-      RowFilter::Up,
-      RowFilter::Average,
-      RowFilter::Paeth,
-  ]; // Utilise tous les types de filtres de ligne
-  options.optimize_alpha = true; // Optimise les canaux alpha
-  options.strip = StripChunks::Safe; // Supprime les métadonnées inutiles
-  options.bit_depth_reduction = true; // Réduit la profondeur de bits si possible
-  options.color_type_reduction = true; // Réduit le type de couleur si possible
-  options.palette_reduction = true; // Réduit la palette de couleurs si possible
-  options.grayscale_reduction = true; // Convertit en niveaux de gris si possible
-  options.interlace = Some(oxipng::Interlacing::None); // Désactive l'entrelacement pour réduire la taille
+    // Valider le chemin d'entrée
+    if !Path::new(input_path).exists() {
+        return Err(format!("Input file does not exist: {}", input_path));
+    }
 
-  let infile = InFile::Path(input_path.into());
-  let outfile = OutFile::Path {
-      path: Some(output_path.to_path_buf()),
-      preserve_attrs: false,
-  };
+    // Configurer les options de compression
+    let mut options = Options::max_compression();
+    options.filter = indexset![
+        RowFilter::None,
+        RowFilter::Sub,
+        RowFilter::Up,
+        RowFilter::Average,
+        RowFilter::Paeth,
+    ];
+    options.optimize_alpha = true;
+    options.strip = StripChunks::Safe;
+    options.bit_depth_reduction = true;
+    options.color_type_reduction = true;
+    options.palette_reduction = true;
+    options.grayscale_reduction = true;
+    options.interlace = Some(oxipng::Interlacing::None);
 
-  let input_size = std::fs::metadata(input_path)
-      .map_err(|e| format!("Failed to read input file metadata: {}", e))?
-      .len();
+    // Lire les métadonnées du fichier d'entrée
+    let input_size = std::fs::metadata(input_path)
+        .map_err(|e| format!("Failed to read input file metadata: {}", e))?
+        .len();
 
-  optimize(&infile, &outfile, &options)
-    .map_err(|e| format!("Failed to optimize PNG: {}", e))?;
+    // Effectuer l'optimisation PNG
+    let infile = InFile::Path(input_path.into());
+    let outfile = OutFile::Path {
+        path: Some(output_path.to_path_buf()),
+        preserve_attrs: false,
+    };
 
-  let output_size = std::fs::metadata(output_path)
-      .map_err(|e| format!("Failed to read output file metadata: {}", e))?
-      .len();
+    optimize(&infile, &outfile, &options)
+        .map_err(|e| format!("Failed to optimize PNG: {}", e))?;
 
-  let compression_ratio = 1.0 - (output_size as f64 / input_size as f64);
+    // Lire les métadonnées du fichier de sortie
+    let output_size = std::fs::metadata(output_path)
+        .map_err(|e| format!("Failed to read output file metadata: {}", e))?
+        .len();
 
-  Ok(CompressionStats {
-      input_size,
-      output_size,
-      compression_ratio,
-  })
+    // Calculer le ratio de compression
+    let compression_ratio = 1.0 - (output_size as f64 / input_size as f64);
+
+    // Retourner les statistiques de compression
+    Ok(CompressionStats {
+        input_size,
+        output_size,
+        compression_ratio,
+    })
 }
