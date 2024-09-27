@@ -15,4 +15,9 @@ pub struct Args {
     /// Convert images to WebP format
     #[arg(long)]
     pub webp: bool,
+
+    /// Resize images to the specified width and height
+    #[arg(short, long)]
+    pub width: Option<u32>,
+    pub height: Option<u32>,
 }

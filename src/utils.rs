@@ -48,3 +48,30 @@ pub fn get_filename_and_extension(input: &Path) -> (String, String) {
       .to_string();
   (input_filename, input_extension)
 }
+
+pub fn resize_image(img: &DynamicImage, width: Option<u32>, height: Option<u32>) -> DynamicImage {
+  let orig_width = img.width();
+  let orig_height = img.height();
+
+  // Handle case where both width and height are None
+  if width.is_none() && height.is_none() {
+      return img.clone();
+  }
+
+  // Calculate new dimensions
+  let new_width = match (width, height) {
+      (Some(w), None) => w,
+      (None, Some(h)) => h * orig_width / orig_height,
+      (Some(w), Some(_)) => w,
+      (None, None) => unreachable!(), // This case is already handled above
+  };
+
+  let new_height = match (width, height) {
+      (Some(_), Some(h)) => h,
+      (Some(w), None) => w * orig_height / orig_width,
+      (None, Some(h)) => h,
+      (None, None) => unreachable!(), // This case is already handled above
+  };
+
+  img.resize(new_width, new_height, image::imageops::FilterType::Lanczos3)
+}
